@@ -4,6 +4,11 @@ const path = require('path');
 const XLSX = require("xlsx");
 const moment = require("moment");
 const program = require('commander');
+const clc = require("cli-color");
+const sprintf = require('sprintf-js').sprintf;
+
+const DateHolidays = require('date-holidays');
+const holidays = new DateHolidays('JP');
 
 program
   .version('0.0.1')
@@ -11,9 +16,22 @@ program
   .option('-w, --workTime [value]', 'Check workTime')
   .option('-o, --overTime [value]', 'Check overTime')
   .option('-t, --totalWorkTime [value]', 'Check totalWorkTime')
+  .option('--holiday', 'Check holiday')
   .parse(process.argv);
 
 const EXCEL_DIR = './excel';
+
+/*
+const arrMin = arr => Math.min(...arr);
+const arrMax = arr => Math.max(...arr);
+const arrSum = arr => arr.reduce((a,b) => a + b, 0);
+const arrAvg = arr => arr.reduce((a,b) => a + b, 0) / arr.length;
+*/
+
+const min2timestr = min => {
+	if(!min) return 0;
+	return sprintf("%02d:%02d",parseInt(min / 60),parseInt(min % 60));
+}
 
 class xlsxAdapter{
 	constructor(fileName){
@@ -37,14 +55,19 @@ class jobkanParser{
 		this.staffCode = await this.xlsx.cell("C4");
 		this.group = await this.xlsx.cell("E4");
 		this.staffType = await this.xlsx.cell("H4");
-		this.totalWorkTime = await this.xlsx.cell("A8");
-		this.totalOverTime = await this.xlsx.cell("B8");
-		this.totalNightTime = await this.xlsx.cell("C8");
+		this.totalWorkTime = await this.parseTimeCell("A8");
+		this.totalOverTime = await this.parseTimeCell("B8");
+		this.totalNightTime = await this.parseTimeCell("C8");
 	}
 	async parseTimeCell(cell){
 		const value = await this.xlsx.cell(cell);
-		return parseInt(value.split(/:/,2).join(''));
+		return this.timestr2min(value);
 	}
+	timestr2min(timestr){
+		const times = timestr.split(/:/,2);
+		return parseInt(times[0]) * 60 + parseInt(times[1]);
+	}
+
 	async workSchedule(){
 		const workSchedule = [];
 		for(let i = 11; i <= 41; i++){
@@ -53,7 +76,7 @@ class jobkanParser{
 			if(dateStr.match(/^[^\d]/)) break;
 
 			workSchedule.push({
-				date: moment([this.year,date[1] - 1,date[2]]).format("YYYY/MM/DD"),
+				date: moment([this.year,date[1] - 1,date[2]]),
 				attendanceScheduleTime: await this.xlsx.cell(`D${i}`),
 				quittingScheduleTime: await this.xlsx.cell(`E${i}`),
 				attendanceTime: await this.xlsx.cell(`F${i}`),
@@ -71,6 +94,7 @@ class jobkanParser{
 
 const main = async () =>{
 	const result = fs.readdirSync(EXCEL_DIR);
+
 	for(let i = 0;i < result.length;i++){
 		if(result[i].match(/^~\$/)) continue;
 		const fileName = path.join(EXCEL_DIR, result[i]);
@@ -78,23 +102,32 @@ const main = async () =>{
 		const jobkan = new jobkanParser(fileName);
 		await jobkan.init();
 		const workSchedule = await jobkan.workSchedule();
-		if(program.totalWorkTime && parseInt(jobkan.totalWorkTime.split(/:/,2).join('')) > parseInt(program.totalWorkTime.split(/:/,2).join(''))){
-			console.log(`${result[i]} ${jobkan.staffName}(${jobkan.staffType}) <- totalWorkTime:${jobkan.totalWorkTime}`);
+
+		if(program.totalWorkTime && jobkan.totalWorkTime > jobkan.timestr2min(program.totalWorkTime)){
+			console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) 労働時間合計が${min2timestr(jobkan.totalWorkTime)}`));
 		}
 
 		for(let time of workSchedule){
 			if(time.attendanceTime > '00:00' && time.quittingTime === '00:00'){
-				console.warn(`${result[i]} ${jobkan.staffName}(${jobkan.staffType}) ${time.date} <- quittingTime:00:00`);
+				console.log(clc.red(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${time.date.format('YYYY年MM月DD日')}の退勤時間が未入力`));
+			}
+
+			if(program.holiday && time.workTime > '00:00'){
+				const hd = holidays.isHoliday(time.date.toDate());
+				if(hd){
+					console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${time.date.format('YYYY年MM月DD日')}(${hd.name})に出勤、実労働時間:${time.workTime}`))
+				} else if((time.date.weekday() == 0 || time.date.weekday() == 6)){
+					console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${time.date.format('YYYY年MM月DD日')}(${time.date.weekday() == 0 ? '日曜日' : '土曜日'})に出勤、実労働時間:${time.workTime}`))
+				}
 			}
 
 			let hasError = false;
-
 			for(let key of ['quittingTime','workTime','overTime']){
 				if (!program[key]) continue;
 				if (time[key] > program[key]) hasError = true;
 			}
 			if(hasError) {
-				console.log(`${result[i]} ${jobkan.staffName}(${jobkan.staffType}) ${time.date}`);
+				console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${time.date.format('YYYY年MM月DD日')}が条件に該当`));
 			}
 		}
 	}

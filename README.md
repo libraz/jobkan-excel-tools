@@ -70,7 +70,7 @@ cd Projects/jobkan-excel-tools
 下記例では`労働時間（総合）`が200時間を超えているメンバーの情報を出力します
 
 ```bash
-node checker.js -t 200:00
+node grep.js -t 200:00
 ```
 
 ### 実労働時間
@@ -78,7 +78,7 @@ node checker.js -t 200:00
 下記例では1日の`実労働時間`が12時間を超えているメンバーおよび勤務日の情報を出力します
 
 ```bash
-node checker.js -w 12:00
+node grep.js -w 12:00
 ```
 
 ### 退勤実時刻
@@ -86,7 +86,7 @@ node checker.js -w 12:00
 下記例では`退勤実時刻`が21時を超えているメンバーおよび勤務日の情報を出力します
 
 ```bash
-node checker.js -q 21:00
+node grep.js -q 21:00
 ```
 
 ### 実残業時間
@@ -94,7 +94,15 @@ node checker.js -q 21:00
 下記例では1日の`実残業時間`が3時間を超えているメンバーおよび勤務日の情報を出力します
 
 ```bash
-node checker.js -o 03:00
+node grep.js -o 03:00
+```
+
+### 休日出勤
+
+休日にも関わらず`実労働時間`の記録が残っているメンバーおよび勤務日の情報を出力します
+
+```bash
+node grep.js --holiday
 ```
 
 ### 退勤打刻忘れ

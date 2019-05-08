@@ -1,5 +1,5 @@
 {
-  "name": "jobkan-excel-tools,
+  "name": "jobkan-excel-tools",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,8 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "cli-color": "^1.4.0",
     "commander": "^2.20.0",
+    "date-holidays": "^1.4.0",
     "moment": "^2.24.0",
+    "sprintf-js": "^1.1.2",
     "xlsx": "^0.14.3"
   }
 }
