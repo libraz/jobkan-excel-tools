@@ -67,7 +67,7 @@ class jobkanParser{
 		const times = timestr.split(/:/,2);
 		return parseInt(times[0]) * 60 + parseInt(times[1]);
 	}
-
+3
 	async workSchedule(){
 		const workSchedule = [];
 		for(let i = 11; i <= 41; i++){
@@ -97,10 +97,17 @@ const main = async () =>{
 
 	for(let i = 0;i < result.length;i++){
 		if(result[i].match(/^~\$/)) continue;
+		if(result[i].match(/^\./)) continue;
 		const fileName = path.join(EXCEL_DIR, result[i]);
 
 		const jobkan = new jobkanParser(fileName);
-		await jobkan.init();
+		try{
+			await jobkan.init();
+		}
+		catch(e){
+			console.error(`ファイル"${fileName}"が読み込みません`);
+			continue;
+		}
 		const workSchedule = await jobkan.workSchedule();
 
 		if(program.totalWorkTime && jobkan.totalWorkTime > jobkan.timestr2min(program.totalWorkTime)){
