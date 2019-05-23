@@ -67,7 +67,7 @@ class jobkanParser{
 		const times = timestr.split(/:/,2);
 		return parseInt(times[0]) * 60 + parseInt(times[1]);
 	}
-3
+
 	async workSchedule(){
 		const workSchedule = [];
 		for(let i = 11; i <= 41; i++){
@@ -97,7 +97,7 @@ const main = async () =>{
 
 	for(let i = 0;i < result.length;i++){
 		if(result[i].match(/^~\$/)) continue;
-		if(result[i].match(/^\./)) continue;
+		if(!result[i].match(/\.xlsx$/)) continue;
 		const fileName = path.join(EXCEL_DIR, result[i]);
 
 		const jobkan = new jobkanParser(fileName);
