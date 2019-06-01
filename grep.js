@@ -96,19 +96,16 @@ class jobkanParser{
 const main = async () =>{
 	const holidayWorkApps = {};
 
-	const holidayWorkAppFile = path.join(EXCEL_DIR,'休日出勤申請の種類.csv');
-	if(fs.existsSync(holidayWorkAppFile)){
-		let data = csvParse(fs.readFileSync(holidayWorkAppFile),{from: 2});
+	const result = fs.readdirSync(EXCEL_DIR);
+	for(let i = 0;i < result.length;i++){
+		if(!result[i].match(/^holidayworking-applied-\d+\.csv$/)) continue;
+		const fileName = path.join(EXCEL_DIR, result[i]);
+		let data = csvParse(fs.readFileSync(fileName),{from: 2});
 		for(let row of data){
-			holidayWorkApps[row[1]] = {
-				date: moment(new Date(row[2].split('/'))),
-				type: row[4]
-			};
+			const dateTime = moment(new Date(row[2].split('/')));
+			holidayWorkApps[`${row[1]}_${dateTime.format('YYYYMMDD')}`] = row[4];
 		}
 	}
-
-	const result = fs.readdirSync(EXCEL_DIR);
-
 
 	for(let i = 0;i < result.length;i++){
 		if(result[i].match(/^~\$/)) continue;
@@ -145,8 +142,9 @@ const main = async () =>{
 				}
 				if(dayString){
 					let logString = clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${ws.date.format('YYYY年MM月DD日')}(${dayString})に出勤、実労働時間:${ws.workTime}`);
-					if(holidayWorkApps[jobkan.staffName] && holidayWorkApps[jobkan.staffName].date.unix() == ws.date.unix()){
-						logString += clc.blue(` 申請済み（${holidayWorkApps[jobkan.staffName].type}）`);
+					const holidayWorkAppsKey = `${jobkan.staffName}_${ws.date.format('YYYYMMDD')}`;
+					if(holidayWorkApps[holidayWorkAppsKey]){
+						logString += clc.blue(` 申請済み：${holidayWorkApps[holidayWorkAppsKey]}`);
 					} else {
 						logString += clc.red(` 未申請`);
 					}
