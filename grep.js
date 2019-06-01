@@ -6,6 +6,7 @@ const moment = require("moment");
 const program = require('commander');
 const clc = require("cli-color");
 const sprintf = require('sprintf-js').sprintf;
+const csvParse = require('csv-parse/lib/sync')
 
 const DateHolidays = require('date-holidays');
 const holidays = new DateHolidays('JP');
@@ -93,7 +94,21 @@ class jobkanParser{
 }
 
 const main = async () =>{
+	const holidayWorkApps = {};
+
+	const holidayWorkAppFile = path.join(EXCEL_DIR,'休日出勤申請の種類.csv');
+	if(fs.existsSync(holidayWorkAppFile)){
+		let data = csvParse(fs.readFileSync(holidayWorkAppFile),{from: 2});
+		for(let row of data){
+			holidayWorkApps[row[1]] = {
+				date: moment(new Date(row[2].split('/'))),
+				type: row[4]
+			};
+		}
+	}
+
 	const result = fs.readdirSync(EXCEL_DIR);
+
 
 	for(let i = 0;i < result.length;i++){
 		if(result[i].match(/^~\$/)) continue;
@@ -114,30 +129,43 @@ const main = async () =>{
 			console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) 労働時間合計が${min2timestr(jobkan.totalWorkTime)}`));
 		}
 
-		for(let time of workSchedule){
-			if(time.attendanceTime > '00:00' && time.quittingTime === '00:00'){
-				console.log(clc.red(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${time.date.format('YYYY年MM月DD日')}の退勤時間が未入力`));
+		for(let ws of workSchedule){
+			if(ws.attendanceTime > '00:00' && ws.quittingTime === '00:00'){
+				console.log(clc.red(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${ws.date.format('YYYY年MM月DD日')}の退勤時間が未入力`));
 			}
 
-			if(program.holiday && time.workTime > '00:00'){
-				const hd = holidays.isHoliday(time.date.toDate());
+			if(program.holiday && ws.workTime > '00:00'){
+				const hd = holidays.isHoliday(ws.date.toDate());
+
+				let dayString;
 				if(hd){
-					console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${time.date.format('YYYY年MM月DD日')}(${hd.name})に出勤、実労働時間:${time.workTime}`))
-				} else if((time.date.weekday() == 0 || time.date.weekday() == 6)){
-					console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${time.date.format('YYYY年MM月DD日')}(${time.date.weekday() == 0 ? '日曜日' : '土曜日'})に出勤、実労働時間:${time.workTime}`))
+					dayString = hd.name;
+				} else if((ws.date.weekday() == 0 || ws.date.weekday() == 6)){
+					dayString = ws.date.weekday() == 0 ? '日曜日' : '土曜日';
+				}
+				if(dayString){
+					let logString = clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${ws.date.format('YYYY年MM月DD日')}(${dayString})に出勤、実労働時間:${ws.workTime}`);
+					if(holidayWorkApps[jobkan.staffName] && holidayWorkApps[jobkan.staffName].date.unix() == ws.date.unix()){
+						logString += clc.blue(` 申請済み（${holidayWorkApps[jobkan.staffName].type}）`);
+					} else {
+						logString += clc.red(` 未申請`);
+					}
+					console.log(logString);
 				}
 			}
 
 			let hasError = false;
 			for(let key of ['quittingTime','workTime','overTime']){
 				if (!program[key]) continue;
-				if (time[key] > program[key]) hasError = true;
+				if (ws[key] > program[key]) hasError = true;
 			}
 			if(hasError) {
-				console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${time.date.format('YYYY年MM月DD日')}が条件に該当`));
+				console.log(clc.blue(`${jobkan.staffName}(${jobkan.staffCode}:${jobkan.staffType}) ${ws.date.format('YYYY年MM月DD日')}が条件に該当`));
 			}
 		}
 	}
+
+
 };
 
 main();
